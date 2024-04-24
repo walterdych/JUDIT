@@ -1,2 +1,2 @@
-# JUDIT-task
- Judgment of Uneven Differential Intensity Tones
+# Judgment of Uneven Differential Intensity Tones (JUDIT) Task
+ 
