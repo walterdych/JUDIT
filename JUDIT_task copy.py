@@ -10,7 +10,7 @@ from psychopy import visual, core, event, sound, gui, data
 
 # Select audio backend
 from psychopy import prefs
-prefs.hardware['audioLib'] = ['PTB', 'sounddevice', 'pyo', 'pygame']
+prefs.hardware['audioLib'] = ['PTB']
 
 from psychopy.event import Mouse
 
@@ -20,21 +20,27 @@ import random
 import csv
 
 # Constants
-BASE_FREQ = 523.251  # Hz
+BASE_FREQ = 440  # Hz
 DURATION = 0.08  # seconds
 INTENSITY_NORMAL = 0.5  # normalized intensity
-INTENSITY_HIGH = 0.65  # higher intensity
 SAMPLE_RATE = 48000  # Hz
 FIXATION_TIME = 2  # seconds for fixation cross
 TRIALS = 200 # number of trials
 
-# Setup the participant dialog box
-info = {'Participant Number': ''}
-dlg = gui.DlgFromDict(dictionary=info, title='Experiment Setup')
-if dlg.OK == False:
-    core.quit()  # user pressed cancel
+dialogue = gui.Dlg(title="JUDIT")
+dialogue.addField('Participant number:')
+dialogue.addField('Condition (1 - 3):')
+dialogue.show()
 
-participant_number = info['Participant Number']
+participant_number = dialogue.data[0]
+condition = int(dialogue.data[1])
+
+# Define the amplitude ranges for each condition
+amplitude_ranges = {
+    1: (.75, .675),  # Easy
+    2: (.675, .625),  # Medium
+    3: (.575, .525)  # Hard
+}
 
 # Initialize PsychoPy window and stimuli
 win = visual.Window([800, 600], fullscr=True, color=(-0.1, -0.1, -0.1))
@@ -43,6 +49,13 @@ message = visual.TextStim(win, pos=(0, -0.3), height=0.05)
 mouse = Mouse(win=win)
 mouse.setVisible(False)
 
+# Conditions as prose
+if condition == 1:
+    conditions = 'Easy'
+elif condition == 2:
+    conditions = 'Medium'
+elif condition == 3:
+    conditions = 'Hard'
 
 # Instructions screen
 instructions = visual.TextStim(win, text="""Welcome to the experiment.
@@ -56,12 +69,12 @@ def show_instructions():
     event.waitKeys(keyList=['space'])  # Wait for space bar press to continue
 
 # Data file setup
-filename = f"JUDIT_{participant_number}.csv"
+filename = f"data/JUDIT_{conditions}_{participant_number}.csv"
 with open(filename, 'w', newline='') as file:
     writer = csv.writer(file)
-    writer.writerow(['p_num', 't_num', 'isPeriodic', 'hasManip', 'hasManip_idx', 'resp', 'corAns', 'isCorrect', 'rt', 'transTimes'])
+    writer.writerow(['p_num', 'condition', 'isPeriodic', 'IOI', 'hasManip', 't_num', 'hasManip_idx', 'resp', 'corAns', 'isCorrect', 'rt', 'intAmnt', 'transTimes'])
 
-def generate_tone(frequency, duration, sample_rate, amplitude=1.0):
+def generate_tone(frequency, duration, sample_rate, amplitude):
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
     tone = amplitude * np.sin(2 * np.pi * frequency * t)
 
@@ -83,31 +96,38 @@ def generate_tone(frequency, duration, sample_rate, amplitude=1.0):
 
     return sound.Sound(tone, sampleRate=sample_rate)
 
-def create_sequence(periodic):
+def create_sequence(periodic, has_high_intensity, high_intensity_positions, condition):
     sequence = []
     high_intensity_index = None
+    percentage_increase = None
+    chosen_IOI = None  # Variable to store the chosen IOI
 
-    if random.random() < 0.5:
-        high_intensity_index = random.choice([11, 12, 13])
+    if has_high_intensity:
+        high_intensity_index = high_intensity_positions.pop()
+        # Select a random amplitude within the range for the condition
+        amplitude_high = np.random.uniform(*amplitude_ranges[condition])
+        percentage_increase = amplitude_high 
+    else:
+        amplitude_high = INTENSITY_NORMAL  # If there is no high intensity tone, use the normal amplitude
 
     for i in range(14):
         if periodic:
-            interval = random.choice([0.2, 0.25])
+            chosen_IOI = random.choice([0.2, 0.25])  # Store the chosen IOI
+            interval = chosen_IOI
         else:
-            while True:
-                interval = np.random.uniform(0.10, 0.45)
-                interval = round(interval, 3)  # Round to 3 decimal places
-                if interval not in [0.2, 0.25]:
-                    break
+            interval = np.random.uniform(0.1, 0.375)
+            interval = round(interval, 3)  # Round to 3 decimal places
+            
 
-        amplitude = INTENSITY_HIGH if i == high_intensity_index else INTENSITY_NORMAL
-        tone = generate_tone(BASE_FREQ, DURATION, SAMPLE_RATE, amplitude)
+        amplitude = amplitude_high if i == high_intensity_index else INTENSITY_NORMAL
+        tone = generate_tone(BASE_FREQ, DURATION, SAMPLE_RATE, amplitude)  # Pass amplitude directly
         sequence.append((tone, interval))
     
-    return sequence, high_intensity_index
+    return sequence, has_high_intensity, high_intensity_index, percentage_increase, chosen_IOI  # Return the chosen IOI
 
-def run_trial(trial_num, periodic):
-    sequence, has_high_intensity = create_sequence(periodic)
+
+def run_trial(trial_num, periodic, has_high_intensity, high_intensity_positions, condition):
+    sequence, has_high_intensity, high_intensity_index, percentage_increase, chosen_IOI = create_sequence(periodic, has_high_intensity, high_intensity_positions, condition)
 
     # Display fixation cross
     fixation.draw()
@@ -149,23 +169,32 @@ def run_trial(trial_num, periodic):
 
     # Round transition times to 3 decimal places
     transition_times = [round(t, 3) for t in transition_times]
+    response_time = round(response_time, 3)
 
-    # Save data
+    # Save
     with open(filename, 'a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow([participant_number, trial_num, periodic, hasManip, has_high_intensity, user_response, correct_answer, correct, response_time, transition_times])
+        writer.writerow([participant_number, condition, periodic, chosen_IOI, hasManip, trial_num, high_intensity_index, user_response, correct_answer, correct, response_time, percentage_increase, transition_times])
 
     return user_response, correct_answer, correct, response_time
+
 
 def main():
     show_instructions()  # Display instructions before the trials begin
     try:
-        for trial_num in range(TRIALS):  # number of trials
-            periodic = random.choice([True, False])
-            run_trial(trial_num, periodic)
+        # Create a list of trial types
+        trial_types = [(True, True), (True, False), (False, True), (False, False)] * (TRIALS // 4)
+        random.shuffle(trial_types)  # Randomize the order of trials
+
+        # Create a list of possible positions for the high intensity tone and shuffle it
+        high_intensity_positions = [11, 12, 13, 14] * (TRIALS // 4)
+        random.shuffle(high_intensity_positions)
+
+        for trial_num, (periodic, has_high_intensity) in enumerate(trial_types):
+            run_trial(trial_num, periodic, has_high_intensity, high_intensity_positions, condition)
     finally:
         mouse.setVisible(True)
         win.close()
 
-if __name__ == "__main__":
-    main()
+# Run the experiment
+main()
