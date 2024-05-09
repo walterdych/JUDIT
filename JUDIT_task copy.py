@@ -15,6 +15,7 @@ prefs.hardware['audioLib'] = ['PTB']
 from psychopy.event import Mouse
 
 # Import other modules
+import os
 import numpy as np
 import random
 import csv
@@ -25,7 +26,7 @@ DURATION = 0.08  # seconds
 INTENSITY_NORMAL = 0.5  # normalized intensity
 SAMPLE_RATE = 48000  # Hz
 FIXATION_TIME = 2  # seconds for fixation cross
-TRIALS = 200 # number of trials
+TRIALS = 260 # number of trials
 
 dialogue = gui.Dlg(title="JUDIT")
 dialogue.addField('Participant number:')
@@ -68,8 +69,13 @@ def show_instructions():
     win.flip()
     event.waitKeys(keyList=['space'])  # Wait for space bar press to continue
 
+
+
 # Data file setup
-filename = f"data/JUDIT_{conditions}_{participant_number}.csv"
+data_dir = 'data/'
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir)
+filename = f"{data_dir}JUDIT_{conditions}_{participant_number}.csv"
 with open(filename, 'w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(['p_num', 'condition', 'isPeriodic', 'IOI', 'hasManip', 't_num', 'hasManip_idx', 'resp', 'corAns', 'isCorrect', 'rt', 'intAmnt', 'transTimes'])
