@@ -11,6 +11,7 @@ SAMPLE_RATE = 96000  # Hz
 SEQ_LEN = 14
 TRIALS = 300  # number of trials
 NUM_STRUCTURES = 5  # number of different trial structures per condition
+MANIP_POS = [11, 12, 13, 14] # positions where high intensity is manipulated
 
 # Define the amplitude ranges for each condition
 amplitude_ranges = {
@@ -97,7 +98,7 @@ for condition in conditions:
     for i in range(1, NUM_STRUCTURES + 1):
         trial_types = [(True, True), (True, False), (False, True), (False, False)] * (TRIALS // 4)
         random.shuffle(trial_types)
-        high_intensity_positions = [11, 12, 13, 14] * (TRIALS // 4)
+        high_intensity_positions = MANIP_POS * (TRIALS // len(MANIP_POS))
         random.shuffle(high_intensity_positions)
         filename = f"trialList/JUDIT_{condition}_{i}.csv"
         generate_and_store_sequences(trial_types, high_intensity_positions, condition, filename)
