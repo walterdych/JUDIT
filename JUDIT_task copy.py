@@ -21,12 +21,13 @@ import random
 import csv
 
 # Constants
-BASE_FREQ = 440  # Hz
+BASE_FREQ = 523.25  # Hz
 DURATION = 0.08  # seconds
 INTENSITY_NORMAL = 0.5  # normalized intensity
-SAMPLE_RATE = 48000  # Hz
-FIXATION_TIME = 2  # seconds for fixation cross
-TRIALS = 260 # number of trials
+SAMPLE_RATE = 96000  # Hz
+FIXATION_TIME = 1  # seconds for fixation cross
+TRIALS = 300 # number of trials
+PRACTICE_TRIALS = 8 # number of practice trials
 
 dialogue = gui.Dlg(title="JUDIT")
 dialogue.addField('Participant number:')
@@ -69,8 +70,6 @@ def show_instructions():
     win.flip()
     event.waitKeys(keyList=['space'])  # Wait for space bar press to continue
 
-
-
 # Data file setup
 data_dir = 'data/'
 if not os.path.exists(data_dir):
@@ -85,8 +84,8 @@ def generate_tone(frequency, duration, sample_rate, amplitude):
     tone = amplitude * np.sin(2 * np.pi * frequency * t)
 
     # Apply envelope (simple linear attack and release)
-    attack_duration = int(sample_rate * 0.01)  # 10 ms attack
-    release_duration = int(sample_rate * 0.01)  # 10 ms release
+    attack_duration = int(sample_rate * 0.02)  # Attack duration of 20 ms
+    release_duration = int(sample_rate * 0.02) # Release duration of 20 ms
     envelope = np.ones_like(tone)
 
     # Create attack (linear ramp from 0 to 1)
@@ -132,12 +131,13 @@ def create_sequence(periodic, has_high_intensity, high_intensity_positions, cond
     return sequence, has_high_intensity, high_intensity_index, percentage_increase, chosen_IOI  # Return the chosen IOI
 
 
-def run_trial(trial_num, periodic, has_high_intensity, high_intensity_positions, condition):
+def run_trial(trial_num, periodic, has_high_intensity, high_intensity_positions, condition, practice=False):
     sequence, has_high_intensity, high_intensity_index, percentage_increase, chosen_IOI = create_sequence(periodic, has_high_intensity, high_intensity_positions, condition)
 
     # Display fixation cross
     fixation.draw()
     win.flip()
+    core.wait(FIXATION_TIME)
 
     # Play sequence and record transition times
     transition_clock = core.Clock()
@@ -177,16 +177,41 @@ def run_trial(trial_num, periodic, has_high_intensity, high_intensity_positions,
     transition_times = [round(t, 3) for t in transition_times]
     response_time = round(response_time, 3)
 
-    # Save
-    with open(filename, 'a', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow([participant_number, condition, periodic, chosen_IOI, hasManip, trial_num, high_intensity_index, user_response, correct_answer, correct, response_time, percentage_increase, transition_times])
+    # Save data only if not in practice phase
+    if not practice:
+        with open(filename, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([participant_number, condition, periodic, chosen_IOI, hasManip, trial_num, high_intensity_index, user_response, correct_answer, correct, response_time, percentage_increase, transition_times])
 
     return user_response, correct_answer, correct, response_time
 
 
+def run_practice():
+    practice_instructions = visual.TextStim(win, text="""This is a practice phase.
+                                  \n\nYou will hear a series of tones and need to decide if any of them differed in intensity.
+                                  \n\nPress 'y' for Yes and 'n' for No.
+                                  \n\nPress the space bar to begin.""", pos=(0, 0), wrapWidth=1.5)
+    practice_instructions.draw()
+    win.flip()
+    event.waitKeys(keyList=['space'])  # Wait for space bar press to start practice
+
+    trial_types = [(True, True), (True, False), (False, True), (False, False)] * (PRACTICE_TRIALS // 4)
+    random.shuffle(trial_types)
+    high_intensity_positions = [11, 12, 13, 14] * (PRACTICE_TRIALS // 4)
+    random.shuffle(high_intensity_positions)
+
+    for trial_num, (periodic, has_high_intensity) in enumerate(trial_types):
+        run_trial(trial_num, periodic, has_high_intensity, high_intensity_positions, condition, practice=True)
+
+    end_practice = visual.TextStim(win, text="""Practice phase complete.
+                                 \n\nPress the space bar to begin the main experiment.""", pos=(0, 0), wrapWidth=1.5)
+    end_practice.draw()
+    win.flip()
+    event.waitKeys(keyList=['space'])  # Wait for space bar press to start main experiment
+
 def main():
     show_instructions()  # Display instructions before the trials begin
+    run_practice()  # Run the practice phase
     try:
         # Create a list of trial types
         trial_types = [(True, True), (True, False), (False, True), (False, False)] * (TRIALS // 4)
