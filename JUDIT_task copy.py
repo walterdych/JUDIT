@@ -1,15 +1,19 @@
+#####################################################
+#
+#                JUDIT Task
+# (Judgment of Uneven Differential Intensity Tones)
+#
+#####################################################
+
 # Select audio backend
 from psychopy import prefs
 prefs.hardware['audioLib'] = ['PTB']
-
 # Set high priority
 import psutil
 p = psutil.Process()
 p.nice(psutil.HIGH_PRIORITY_CLASS)
-
 # Import PsychoPy modules
 from psychopy import visual, core, event, sound, gui, data
-
 # Import other modules
 import os
 import numpy as np
