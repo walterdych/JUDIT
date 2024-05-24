@@ -21,7 +21,7 @@ TODAY = datetime.datetime.now().strftime('%d-%m-%Y')
 BASE_FREQ = 523.25  # Base frequency for tone generation in Hz
 DURATION = 0.08  # Duration of each tone in seconds
 INTENSITY_NORMAL_DB = -6  # Default sound intensity in decibels
-SAMPLE_RATE = 48000  # Sampling rate for the audio in Hz
+SAMPLE_RATE = 96000  # Sampling rate for the audio in Hz
 FIXATION_TIME = 1  # Duration for fixation cross display in seconds
 SEQ_LEN = 14  # Number of tones in a sequence
 NUM_BLOCKS = 6  # Number of experimental blocks
@@ -222,12 +222,13 @@ def run_adaptive_trial(trial_num):
     if correct:
         correct_responses += 1
         incorrect_responses = 0
-        if correct_responses >= 1:
+        if correct_responses >= 2:
             current_intensity_change_db = max(min_intensity_change_db, current_intensity_change_db - step_size_db)
             correct_responses = 0
     else:
         incorrect_responses += 1
-        if incorrect_responses >= 2:
+        correct_responses = 0
+        if incorrect_responses >= 1:
             current_intensity_change_db = min(max_intensity_change_db, current_intensity_change_db + step_size_db)
             incorrect_responses = 0
 
@@ -255,10 +256,10 @@ def run_adaptive_practice():
 
     # Inform participant of their intensity change threshold at the end of practice (for debugging purposes)
     end_practice_text = f"""Practice phase complete.\n\n
-    Your 50% threshold intensity change is {current_intensity_change_db:.2f} dB.\n
+    Your 70% threshold intensity change is {current_intensity_change_db:.2f} dB.\n
     Press the space bar to begin the main experiment."""
     end_practice = visual.TextStim(win, text=end_practice_text, pos=(0, 0), wrapWidth=1.5)
-    end_practice.draw() 
+    end_practice.draw()
     win.flip()
     event.waitKeys(keyList=['space'])
 
@@ -287,7 +288,10 @@ def main():
         adaptive_intensity_change_db = run_adaptive_practice()
     try:
         for index, trial in tqdm(block_trials.iterrows(), total=len(block_trials), desc=f"Block {block_num + 1} Trials"):
-            run_trial(trial, intensity_change_db=adaptive_intensity_change_db)
+            if skip_practice == False:
+                run_trial(trial, intensity_change_db=adaptive_intensity_change_db)
+            else:
+                run_trial(trial)
         block_num += 1
         while block_num < NUM_BLOCKS:
             block_trials = trial_data[block_num * TRIALS_PER_BLOCK: (block_num + 1) * TRIALS_PER_BLOCK]
@@ -297,7 +301,10 @@ def main():
             win.flip()
             event.waitKeys(keyList=['space'])
             for index, trial in tqdm(block_trials.iterrows(), total=len(block_trials), desc=f"Block {block_num + 1} Trials"):
-                run_trial(trial, intensity_change_db=adaptive_intensity_change_db)
+                if skip_practice == False:
+                    run_trial(trial, intensity_change_db=adaptive_intensity_change_db)
+                else:
+                    run_trial(trial)
             block_num += 1
     finally:
         mouse.setVisible(True)
