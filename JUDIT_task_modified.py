@@ -167,9 +167,10 @@ step_size_db = 0.125  # Step size for adjusting intensity change
 correct_responses = 0  # Counter for correct responses
 incorrect_responses = 0  # Counter for incorrect responses
 current_intensity_change_db = initial_intensity_change_db  # Current intensity change
-adaptive_trials = 32  # Number of adaptive trials
+adaptive_trials = 36  # Number of adaptive trials
 adaptive_tracking_data = []  # List to store data from adaptive trials
 last_three_trials = []  # List to store intensities of the last three trials
+adaptive_tracking_blocks = 3  # Number of adaptive tracking blocks
 
 # Function to run an adaptive trial and adjust intensity based on user response
 def run_adaptive_trial(trial_num):
@@ -211,7 +212,6 @@ def run_adaptive_trial(trial_num):
         core.quit()
 
     user_response = 'yes' if 'y' in keys[0][0] else 'no'
-    response_time = round(keys[0][1], 3)
     correct_answer = 'yes'
     correct = 1 if user_response == correct_answer else 0
 
@@ -251,10 +251,30 @@ def run_adaptive_practice():
     win.flip()
     event.waitKeys(keyList=['space'])
 
-    for trial_num in tqdm(range(adaptive_trials), desc="Adaptive Practice Trials"):
-        current_intensity_change_db = run_adaptive_trial(trial_num)
+    for trial_num in tqdm(range(adaptive_trials), desc="Adaptive Tracking Block 1"):
+        block1_intensity_change = run_adaptive_trial(trial_num)
 
     # Inform participant of their intensity change threshold at the end of practice (for debugging purposes)
+    end_practice_block_text = f"""Press Space to continue to next block.\n\n"""
+    end_practice = visual.TextStim(win, text=end_practice_block_text, pos=(0, 0), wrapWidth=1.5)
+    end_practice.draw()
+    win.flip()
+    event.waitKeys(keyList=['space'])
+
+    for trial_num in tqdm(range(adaptive_trials), desc="Adaptive Tracking Block 2"):
+        block2_intensity_change = run_adaptive_trial(trial_num)
+
+    end_practice_block_text = f"""Press Space to continue to next block.\n\n"""
+    end_practice = visual.TextStim(win, text=end_practice_block_text, pos=(0, 0), wrapWidth=1.5)
+    end_practice.draw()
+    win.flip()
+    event.waitKeys(keyList=['space'])
+
+    for trial_num in tqdm(range(adaptive_trials), desc="Adaptive Tracking Block 3"):
+        block3_intensity_change = run_adaptive_trial(trial_num)
+
+    current_intensity_change_db = (block1_intensity_change + block2_intensity_change + block3_intensity_change) / 3
+
     end_practice_text = f"""Practice phase complete.\n\n
     Your 70% threshold intensity change is {current_intensity_change_db:.2f} dB.\n
     Press the space bar to begin the main experiment."""
@@ -283,15 +303,15 @@ def main():
     block_trials = trial_data[:TRIALS_PER_BLOCK]
     with open(filename, 'w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['participant_number', 'periodic', 'chosen_IOI', 'has_high_intensity', 'trial_num', 'high_intensity_index', 'user_response', 'correct_answer', 'correct', 'response_time'])
+        writer.writerow(['participant_number', 'periodic', 'chosen_ITI', 'has_high_intensity', 'trial_num', 'high_intensity_index', 'user_response', 'correct_answer', 'correct', 'response_time'])
     if not skip_practice:
         adaptive_intensity_change_db = run_adaptive_practice()
     try:
-        for index, trial in tqdm(block_trials.iterrows(), total=len(block_trials), desc=f"Block {block_num + 1} Trials"):
-            if skip_practice == False:
-                run_trial(trial, intensity_change_db=adaptive_intensity_change_db)
-            else:
-                run_trial(trial)
+        for trial in tqdm(block_trials.iterrows(), total=len(block_trials), desc=f"Block {block_num + 1} Trials"):
+                if skip_practice == False:
+                    run_trial(trial, intensity_change_db=adaptive_intensity_change_db)
+                else:
+                    run_trial(trial)
         block_num += 1
         while block_num < NUM_BLOCKS:
             block_trials = trial_data[block_num * TRIALS_PER_BLOCK: (block_num + 1) * TRIALS_PER_BLOCK]
@@ -300,7 +320,7 @@ def main():
             break_message.draw()
             win.flip()
             event.waitKeys(keyList=['space'])
-            for index, trial in tqdm(block_trials.iterrows(), total=len(block_trials), desc=f"Block {block_num + 1} Trials"):
+            for trial in tqdm(block_trials.iterrows(), total=len(block_trials), desc=f"Block {block_num + 1} Trials"):
                 if skip_practice == False:
                     run_trial(trial, intensity_change_db=adaptive_intensity_change_db)
                 else:
@@ -312,3 +332,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
